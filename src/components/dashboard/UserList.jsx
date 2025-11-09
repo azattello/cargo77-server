@@ -3,8 +3,9 @@ import './css/admin.css';
 import search from "../../assets/img/search.png";
 import axios from 'axios';
 import config from "../../config";
-import { getFilials, getFilialByUserPhone  } from "../../action/filial"; // Импортируем getFilials для получения списка филиалов
+import { getFilials } from "../../action/filial";
 import { useSelector } from 'react-redux';
+import { useFilialData } from '../../hooks/useFilialData';
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -46,43 +47,58 @@ const UserList = () => {
   const role = useSelector(state => state.user.currentUser.role);
   const userPhone = useSelector(state => state.user.currentUser.phone);
   
-  console.log(role)
+  // Используем хук для получения данных о филиале
+  const { filialData, isLoading: isFilialLoading } = useFilialData(role, userPhone);
 
+  // Устанавливаем филиал при получении данных
   useEffect(() => {
-    const fetchFilialData = async () => {
-      try {
-        const data = await getFilialByUserPhone(userPhone);
-        console.log(data.filialText); // Исправлено здесь
-        setSortByFilial(data.filialText)
-
-      } catch (error) {
-        console.error('Ошибка при загрузке данных о филиале:', error);
-      }
-    };
-  
-    if (role === "filial") {
-      fetchFilialData();
+    if (filialData?.filialText && role === 'filial') {
+      setSortByFilial(filialData.filialText);
     }
-  }, [userPhone,role]);
-  
-
-  useEffect(() => {
-    // Загружаем список филиалов при загрузке компонента
-    const fetchFilials = async () => {
-      const allFilials = await getFilials();
-      setFilials(allFilials);
-    };
-    fetchFilials();
-  }, []);
+  }, [filialData, role]);
 
   // Функция для установки нового значения currentPage
   const setPage = (newPage) => {
     setCurrentPage(newPage <= 0 ? 1 : newPage);
   };
 
+  // Эффект для загрузки пользователей
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        // Если идет загрузка данных о филиале для сотрудника филиала, ждем
+        if (role === 'filial' && isFilialLoading) {
+          console.log('Waiting for filial data...');
+          return;
+        }
+
+        // Если роль филиал, но нет данных о филиале, не загружаем
+        if (role === 'filial' && !sortByFilial) {
+          console.log('No filial data available yet');
+          return;
+        }
+
+        // Загружаем список всех филиалов только для админа
+        if (role === 'admin' && filials.length === 0) {
+          try {
+            const allFilials = await getFilials();
+            setFilials(allFilials);
+          } catch (error) {
+            console.error('Error loading filials:', error);
+          }
+        }
+
+        console.log('Loading users with params:', {
+          page: currentPage,
+          limit: perPage,
+          search: searchTerm,
+          sortByDate,
+          sortByActivity,
+          filterByRole: sortByRole,
+          filterByFilial: role === 'filial' ? sortByFilial : sortByFilial || '',
+          role
+        });
+
         const response = await axios.get(`${config.apiUrl}/api/user/users`, {
           params: {
             page: currentPage,
@@ -90,20 +106,29 @@ const UserList = () => {
             search: searchTerm,
             sortByDate: sortByDate,
             sortByActivity: sortByActivity,
-            filterByRole : sortByRole,
-            filterByFilial: sortByFilial, // Фильтрация по филиалу
+            filterByRole: sortByRole,
+            filterByFilial: role === 'filial' ? sortByFilial : sortByFilial || '',
           }
         });
 
-        setUsers(response.data.users);
-        setTotalUsers(response.data.totalCount); // Обновление общего количества пользователей
+        if (response.data) {
+          setUsers(response.data.users);
+          setTotalUsers(response.data.totalCount);
+          
+          console.log('Received users:', {
+            count: response.data.users.length,
+            total: response.data.totalCount,
+            role: role,
+            filial: sortByFilial
+          });
+        }
       } catch (error) {
         console.error('Ошибка при получении пользователей:', error.message);
       }
     };
 
     fetchUsers();
-  }, [currentPage, perPage, sortByDate, searchTerm, sortByActivity, sortByRole, sortByFilial]);
+  }, [currentPage, perPage, sortByDate, searchTerm, sortByActivity, sortByRole, sortByFilial, role, isFilialLoading, filials.length]);
 
   const handleSortByFilial = (filial) => {
     setSortByFilial(filial);
@@ -307,6 +332,14 @@ const UserList = () => {
                 )}
               </div>
             </>
+          )}
+          {/* Для сотрудника филиала показываем только его филиал */}
+          {role === 'filial' && (
+            <div className="status-filter">
+              <div className="filter-point">
+                {sortByFilial || 'Загрузка...'}
+              </div>
+            </div>
           )}
 
         </div>

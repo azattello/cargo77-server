@@ -244,6 +244,41 @@
 }
 
 
+.filial-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.filial-button {
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.filial-button.edit {
+    background-color: #4CAF50;
+    color: #fff;
+    transition: background-color 0.3s;
+}
+
+.filial-button.edit:hover {
+    background-color: #45a049;
+}
+
+.filial-button.delete {
+    background-color: #f44336;
+    color: #fff;
+    transition: background-color 0.3s;
+}
+
+.filial-button.delete:hover {
+    background-color: #d32f2f;
+}
+
+
 
 
 
